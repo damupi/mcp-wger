@@ -1,5 +1,7 @@
 # fastmcp-wger
 
+[![Tests](https://github.com/damupi/mcp-wger/actions/workflows/test.yml/badge.svg)](https://github.com/damupi/mcp-wger/actions/workflows/test.yml)
+
 FastMCP server that wraps the [wger](https://github.com/wger-project/wger) fitness REST API as an MCP interface. Lets any MCP-compatible LLM (Claude Desktop, etc.) read and write your workout data via natural language. Works with the public [wger.de](https://wger.de) instance out of the box, or with any self-hosted wger server.
 
 ## Features
