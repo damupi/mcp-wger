@@ -169,12 +169,15 @@ fastmcp-wger/
 │   ├── nutrition.py
 │   ├── tracking.py
 │   └── user.py
-└── test/
-    ├── conftest.py
-    ├── test_client.py
-    ├── test_exercises.py
-    ├── test_workouts.py
-    ├── test_nutrition.py
-    ├── test_tracking.py
-    └── test_user.py
+├── test/
+│   ├── conftest.py
+│   ├── test_client.py
+│   ├── test_exercises.py
+│   ├── test_workouts.py
+│   ├── test_nutrition.py
+│   ├── test_tracking.py
+│   └── test_user.py
+└── .github/
+    └── workflows/
+        └── test.yml   # CI — runs tests on push and PRs
 ```
