@@ -70,7 +70,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "args": ["run", "python", "server.py"],
       "cwd": "/path/to/fastmcp-wger",
       "env": {
-        "WGER_BASE_URL": "http://192.168.0.11:8009/api/v2",
+        "WGER_BASE_URL": "http://localhost:80/api/v2",
         "WGER_API_TOKEN": "your-token-here"
       }
     }
