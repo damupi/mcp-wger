@@ -33,7 +33,7 @@ cp .env.example .env
 ```
 
 ```env
-WGER_BASE_URL=http://192.168.0.11:8009/api/v2
+WGER_BASE_URL=http://localhost:80/api/v2
 WGER_API_TOKEN=your-token-here
 ```
 
