@@ -33,7 +33,7 @@ mcp.mount(nutrition_server)
 mcp.mount(tracking_server)
 mcp.mount(user_server)
 
-if __name__ == "__main__":
+def main() -> None:
     parser = argparse.ArgumentParser(description="wger FastMCP server")
     parser.add_argument(
         "--transport",
@@ -49,3 +49,7 @@ if __name__ == "__main__":
         mcp.run(transport="streamable-http", host=args.host, port=args.port)
     else:
         mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()

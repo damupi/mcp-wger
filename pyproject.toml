@@ -14,8 +14,11 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[project.scripts]
+mcp-wger = "server:main"
+
 [tool.hatch.build.targets.wheel]
-packages = ["tools"]
+packages = ["tools", "server.py"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

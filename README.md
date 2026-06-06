@@ -19,9 +19,15 @@ FastMCP server that exposes your self-hosted [wger](https://github.com/wger-proj
 ## Installation
 
 ```bash
-git clone <repo>
-cd fastmcp-wger
+git clone https://github.com/damupi/mcp-wger.git
+cd mcp-wger
 uv sync
+```
+
+Or install directly as a CLI tool:
+
+```bash
+uv tool install git+https://github.com/damupi/mcp-wger.git
 ```
 
 ## Configuration
@@ -44,13 +50,15 @@ Get your API token from wger at **Settings → API key**.
 ### stdio (default — for Claude Desktop)
 
 ```bash
-uv run python server.py
+mcp-wger
+# or without installing:
+uv run mcp-wger
 ```
 
 ### HTTP transport
 
 ```bash
-uv run python server.py --transport http --port 8000
+mcp-wger --transport http --port 8000
 ```
 
 Options:
@@ -67,7 +75,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "wger": {
       "command": "uv",
-      "args": ["run", "python", "server.py"],
+      "args": ["run", "mcp-wger"],
       "cwd": "/path/to/fastmcp-wger",
       "env": {
         "WGER_BASE_URL": "http://localhost:80/api/v2",
