@@ -1,6 +1,6 @@
 # fastmcp-wger
 
-FastMCP server that exposes your self-hosted [wger](https://github.com/wger-project/wger) fitness tracker as an MCP interface. Lets any MCP-compatible LLM (Claude Desktop, etc.) read and write your workout data via natural language.
+FastMCP server that wraps the [wger](https://github.com/wger-project/wger) fitness REST API as an MCP interface. Lets any MCP-compatible LLM (Claude Desktop, etc.) read and write your workout data via natural language. Works with the public [wger.de](https://wger.de) instance out of the box, or with any self-hosted wger server.
 
 ## Features
 
@@ -14,7 +14,7 @@ FastMCP server that exposes your self-hosted [wger](https://github.com/wger-proj
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) package manager
-- A running wger instance (self-hosted)
+- A wger account — either on [wger.de](https://wger.de) (free, no setup) or a self-hosted instance
 
 ## Installation
 
@@ -47,7 +47,30 @@ WGER_API_TOKEN=your-token-here
 
 Get your API token from wger at **Settings → API key**.
 
-> **Self-hosted?** Set `WGER_BASE_URL` to your instance (e.g. `http://localhost:80/api/v2`). Otherwise the public [wger.de](https://wger.de) API is used by default.
+### Using wger.de (public instance)
+
+1. Create a free account at [wger.de](https://wger.de/en/user/register)
+2. Go to **Settings → API key** and copy your token
+3. Set `WGER_API_TOKEN` in your `.env` — no need to set `WGER_BASE_URL`
+
+### Self-hosting wger
+
+Run wger locally with Docker:
+
+```bash
+docker run -ti --name wger \
+  -p 80:80 \
+  wger/server:latest
+```
+
+Then set both variables in your `.env`:
+
+```env
+WGER_BASE_URL=http://localhost:80/api/v2
+WGER_API_TOKEN=your-token-here
+```
+
+Full self-hosting docs: [github.com/wger-project/wger](https://github.com/wger-project/wger#installation)
 
 ## Usage
 
@@ -82,7 +105,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "args": ["run", "mcp-wger"],
       "cwd": "/path/to/fastmcp-wger",
       "env": {
-        "WGER_API_TOKEN": "your-token-here"
+        "WGER_API_TOKEN": "your-token-here",
+        "WGER_BASE_URL": "http://localhost:80/api/v2"
       }
     }
   }
