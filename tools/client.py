@@ -14,8 +14,10 @@ class WgerClient:
     Reads WGER_BASE_URL and WGER_API_TOKEN from environment.
     """
 
+    DEFAULT_BASE_URL = "https://wger.de/api/v2"
+
     def __init__(self) -> None:
-        base_url = os.environ["WGER_BASE_URL"].rstrip("/")
+        base_url = os.environ.get("WGER_BASE_URL", self.DEFAULT_BASE_URL).rstrip("/")
         token = os.environ["WGER_API_TOKEN"]
         self._client = httpx.AsyncClient(
             base_url=base_url,

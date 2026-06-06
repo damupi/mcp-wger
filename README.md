@@ -39,11 +39,15 @@ cp .env.example .env
 ```
 
 ```env
-WGER_BASE_URL=http://localhost:80/api/v2
+# Optional — defaults to https://wger.de/api/v2 if not set
+# WGER_BASE_URL=http://localhost:80/api/v2
+
 WGER_API_TOKEN=your-token-here
 ```
 
 Get your API token from wger at **Settings → API key**.
+
+> **Self-hosted?** Set `WGER_BASE_URL` to your instance (e.g. `http://localhost:80/api/v2`). Otherwise the public [wger.de](https://wger.de) API is used by default.
 
 ## Usage
 
@@ -78,7 +82,6 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "args": ["run", "mcp-wger"],
       "cwd": "/path/to/fastmcp-wger",
       "env": {
-        "WGER_BASE_URL": "http://localhost:80/api/v2",
         "WGER_API_TOKEN": "your-token-here"
       }
     }
