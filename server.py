@@ -8,6 +8,7 @@ from fastmcp import FastMCP
 
 from tools.exercises import exercises_server
 from tools.nutrition import nutrition_server
+from tools.templates import templates_server
 from tools.tracking import tracking_server
 from tools.user import user_server
 from tools.workouts import workouts_server
@@ -29,6 +30,7 @@ mcp = FastMCP(
 
 mcp.mount(exercises_server)
 mcp.mount(workouts_server)
+mcp.mount(templates_server)
 mcp.mount(nutrition_server)
 mcp.mount(tracking_server)
 mcp.mount(user_server)
