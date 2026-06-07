@@ -106,20 +106,30 @@ async def copy_day_to_routine(
     new_name: Annotated[str | None, "Optional new name for the copied day"] = None,
     client: WgerClient = Depends(get_wger_client),
 ) -> dict[str, Any]:
-    """Copy a training day (with all its exercises) into a different routine.
+    """Copy a training day (with all its exercises and configs) into a different routine.
 
     Since the wger API has no native duplicate endpoint, this tool
     reconstructs the day client-side:
       1. Reads the source day, its slots, and each slot's exercises
-      2. Creates a new day in the target routine
-      3. Recreates every slot and exercise entry under the new day
+      2. Reads all progression configs (sets, reps, weight, rest, RiR) per entry
+      3. Creates a new day in the target routine
+      4. Recreates every slot, exercise entry, and all configs under the new day
 
     Use this to reuse a day from a template — or any routine — as a
     starting point in a new routine. The copy is fully independent and
     can be edited without affecting the original.
 
-    Returns a summary: new_day_id, slots_copied, entries_copied.
+    Returns a summary: new_day_id, slots_copied, entries_copied, configs_copied.
     """
+    # Config endpoints to copy for each slot entry
+    config_endpoints = [
+        "repetitions-config",
+        "sets-config",
+        "weight-config",
+        "rest-config",
+        "rir-config",
+    ]
+
     async with client:
         # 1. Fetch source day
         try:
@@ -130,13 +140,24 @@ async def copy_day_to_routine(
         # 2. Fetch all slots for this day
         slots, _ = await client.paginate("/slot/", limit=100, day=day_id)
 
-        # 3. Fetch entries for each slot
+        # 3. Fetch entries and their configs for each slot
         slot_entries: dict[int, list[dict[str, Any]]] = {}
         for slot in slots:
             entries, _ = await client.paginate("/slot-entry/", limit=100, slot=slot["id"])
             slot_entries[slot["id"]] = entries
 
-        # 4. Create the new day in the target routine
+        # 4. Fetch all configs for every source entry
+        entry_configs: dict[int, list[tuple[str, dict[str, Any]]]] = {}
+        for slot in slots:
+            for entry in slot_entries[slot["id"]]:
+                eid = entry["id"]
+                entry_configs[eid] = []
+                for endpoint in config_endpoints:
+                    cfgs, _ = await client.paginate(f"/{endpoint}/", limit=100, slot_entry=eid)
+                    for cfg in cfgs:
+                        entry_configs[eid].append((endpoint, cfg))
+
+        # 5. Create the new day in the target routine
         new_day = await client.post("/day/", {
             "routine": target_routine_id,
             "name": new_name or source_day["name"],
@@ -147,9 +168,10 @@ async def copy_day_to_routine(
         })
         new_day_id: int = new_day["id"]
 
-        # 5. Recreate slots and entries
+        # 6. Recreate slots, entries, and all configs
         slots_copied = 0
         entries_copied = 0
+        configs_copied = 0
         for slot in slots:
             new_slot = await client.post("/slot/", {
                 "day": new_day_id,
@@ -159,7 +181,7 @@ async def copy_day_to_routine(
             slots_copied += 1
 
             for entry in slot_entries[slot["id"]]:
-                await client.post("/slot-entry/", {
+                new_entry = await client.post("/slot-entry/", {
                     "slot": new_slot["id"],
                     "exercise": entry["exercise"],
                     "type": entry.get("type", "normal"),
@@ -170,10 +192,18 @@ async def copy_day_to_routine(
                 })
                 entries_copied += 1
 
+                # Copy all configs, pointing them at the new entry id
+                for endpoint, cfg in entry_configs[entry["id"]]:
+                    payload = {k: v for k, v in cfg.items() if k != "id"}
+                    payload["slot_entry"] = new_entry["id"]
+                    await client.post(f"/{endpoint}/", payload)
+                    configs_copied += 1
+
     return {
         "new_day_id": new_day_id,
         "source_day_name": source_day["name"],
         "target_routine_id": target_routine_id,
         "slots_copied": slots_copied,
         "entries_copied": entries_copied,
+        "configs_copied": configs_copied,
     }
