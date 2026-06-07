@@ -132,3 +132,129 @@ async def list_training_sessions(
     async with client:
         items, total = await client.paginate("/workoutsession/", limit=limit, offset=offset)
     return _paged(items, total, offset, limit)
+
+
+@workouts_server.tool
+async def create_training_session(
+    date: Annotated[str, "Date of the session (YYYY-MM-DD)"],
+    workout_id: Annotated[int, "Workout/routine ID this session belongs to"],
+    notes: Annotated[str, "Free-text notes about the session"] = "",
+    impression: Annotated[int, "Overall impression: 1=General, 2=Burned out, 3=Good, 4=Excellent"] = 3,
+    time_start: Annotated[str | None, "Session start time (HH:MM:SS)"] = None,
+    time_end: Annotated[str | None, "Session end time (HH:MM:SS)"] = None,
+    client: WgerClient = Depends(get_wger_client),
+) -> dict[str, Any]:
+    """Create a new training session (the header that groups a set of workout logs).
+
+    Call this before log_workout_set() when logging a full training session.
+    Returns the created session including its ID, which can be linked to logs.
+    """
+    payload: dict[str, Any] = {
+        "date": date,
+        "workout": workout_id,
+        "notes": notes,
+        "impression": impression,
+    }
+    if time_start is not None:
+        payload["time_start"] = time_start
+    if time_end is not None:
+        payload["time_end"] = time_end
+    async with client:
+        return await client.post("/workoutsession/", payload)
+
+
+@workouts_server.tool(annotations=ToolAnnotations(readOnlyHint=True))
+async def get_routine_structure(
+    routine_id: Annotated[int, "Routine ID"],
+    client: WgerClient = Depends(get_wger_client),
+) -> dict[str, Any]:
+    """Get the full nested structure of a routine: days → slots → entries + configs.
+
+    Useful for understanding exactly what exercises, sets, reps and weights are
+    prescribed in each day of the routine, including progression rules.
+    """
+    from fastmcp.exceptions import ToolError
+
+    try:
+        async with client:
+            return await client.get(f"/routine/{routine_id}/structure/")
+    except httpx.HTTPStatusError as exc:
+        raise ToolError(f"Routine {routine_id} not found: {exc}") from exc
+
+
+@workouts_server.tool(annotations=ToolAnnotations(readOnlyHint=True))
+async def get_routine_schedule(
+    routine_id: Annotated[int, "Routine ID"],
+    client: WgerClient = Depends(get_wger_client),
+) -> list[dict[str, Any]]:
+    """Get the date-by-date training schedule for a routine (display view).
+
+    Returns one entry per date showing which day and exercises are planned.
+    Repeated sets of the same exercise are folded together for readability.
+    Useful for answering 'what should I train today?' or 'what's this week's plan?'
+    """
+    from fastmcp.exceptions import ToolError
+
+    try:
+        async with client:
+            return await client.get(f"/routine/{routine_id}/date-sequence-display/")
+    except httpx.HTTPStatusError as exc:
+        raise ToolError(f"Routine {routine_id} not found: {exc}") from exc
+
+
+@workouts_server.tool(annotations=ToolAnnotations(readOnlyHint=True))
+async def get_routine_gym_view(
+    routine_id: Annotated[int, "Routine ID"],
+    client: WgerClient = Depends(get_wger_client),
+) -> list[dict[str, Any]]:
+    """Get the date-by-date schedule split into individual sets (gym mode).
+
+    Supersets are interleaved set-by-set (e.g. A1, B1, A2, B2…).
+    Use this when guiding a user through a live workout session.
+    """
+    from fastmcp.exceptions import ToolError
+
+    try:
+        async with client:
+            return await client.get(f"/routine/{routine_id}/date-sequence-gym/")
+    except httpx.HTTPStatusError as exc:
+        raise ToolError(f"Routine {routine_id} not found: {exc}") from exc
+
+
+@workouts_server.tool(annotations=ToolAnnotations(readOnlyHint=True))
+async def get_routine_logs(
+    routine_id: Annotated[int, "Routine ID"],
+    client: WgerClient = Depends(get_wger_client),
+) -> list[dict[str, Any]]:
+    """Get all workout sessions and logs for a routine, grouped by session.
+
+    Each entry contains the session (date, notes, impression) and the list
+    of individual log entries (exercise, reps, weight, targets).
+    """
+    from fastmcp.exceptions import ToolError
+
+    try:
+        async with client:
+            return await client.get(f"/routine/{routine_id}/logs/")
+    except httpx.HTTPStatusError as exc:
+        raise ToolError(f"Routine {routine_id} not found: {exc}") from exc
+
+
+@workouts_server.tool(annotations=ToolAnnotations(readOnlyHint=True))
+async def get_routine_stats(
+    routine_id: Annotated[int, "Routine ID"],
+    client: WgerClient = Depends(get_wger_client),
+) -> dict[str, Any]:
+    """Get aggregated training statistics for a routine.
+
+    Returns volume (kg moved), set counts, and estimated 1RM (Brzycki formula)
+    broken down by day, ISO week, iteration, and exercise.
+    Great for tracking progress over time.
+    """
+    from fastmcp.exceptions import ToolError
+
+    try:
+        async with client:
+            return await client.get(f"/routine/{routine_id}/stats/")
+    except httpx.HTTPStatusError as exc:
+        raise ToolError(f"Routine {routine_id} not found: {exc}") from exc
