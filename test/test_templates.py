@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 import httpx
 import pytest
@@ -151,12 +152,12 @@ async def test_set_template_visibility_makes_private(
 # ---------------------------------------------------------------------------
 
 @pytest.mark.respx(base_url="http://testserver/api/v2")
-async def test_copy_day_to_routine_creates_day_slots_and_entries(
+async def test_copy_day_to_routine_creates_day_slots_entries_and_configs(
     respx_mock: respx.MockRouter, mcp_client: Client
 ) -> None:
     """
-    Source day 3 has 2 slots, each with 1 entry.
-    copy_day_to_routine should POST 1 day + 2 slots + 2 entries in the target routine.
+    Source day 3 has 2 slots, each with 1 entry and reps+sets+weight configs.
+    copy_day_to_routine should POST: 1 day + 2 slots + 2 entries + 6 configs.
     """
     source_day = {"id": 3, "routine": 1, "name": "Legs", "order": 3, "is_rest": False, "type": "custom", "config": None, "description": ""}
     slots = make_paginated([
@@ -173,9 +174,19 @@ async def test_copy_day_to_routine_creates_day_slots_and_entries(
          "comment": "Reverse Lunge", "repetition_unit": 1, "weight_unit": 1,
          "repetition_rounding": None, "weight_rounding": None, "config": None},
     ])
-    new_day = {"id": 10, "routine": 5, "name": "Legs", "order": 1}
-    new_slot_1 = {"id": 101, "day": 10, "order": 1}
-    new_slot_2 = {"id": 102, "day": 10, "order": 2}
+    # Configs for entry 21: reps=10, sets=4, weight=82.5
+    reps_cfg_21   = make_paginated([{"id": 1, "slot_entry": 21, "iteration": 1, "value": "10.00", "operation": "r", "step": "na", "repeat": False, "requirements": None}])
+    sets_cfg_21   = make_paginated([{"id": 2, "slot_entry": 21, "iteration": 1, "value": 4,       "operation": "r", "step": "na", "repeat": False, "requirements": None}])
+    weight_cfg_21 = make_paginated([{"id": 3, "slot_entry": 21, "iteration": 1, "value": "82.50", "operation": "r", "step": "na", "repeat": False, "requirements": None}])
+    # Configs for entry 22: reps=12, sets=3, weight=10
+    reps_cfg_22   = make_paginated([{"id": 4, "slot_entry": 22, "iteration": 1, "value": "12.00", "operation": "r", "step": "na", "repeat": False, "requirements": None}])
+    sets_cfg_22   = make_paginated([{"id": 5, "slot_entry": 22, "iteration": 1, "value": 3,       "operation": "r", "step": "na", "repeat": False, "requirements": None}])
+    weight_cfg_22 = make_paginated([{"id": 6, "slot_entry": 22, "iteration": 1, "value": "10.00", "operation": "r", "step": "na", "repeat": False, "requirements": None}])
+    empty_page    = make_paginated([])
+
+    new_day     = {"id": 10, "routine": 5, "name": "Legs", "order": 1}
+    new_slot_1  = {"id": 101, "day": 10, "order": 1}
+    new_slot_2  = {"id": 102, "day": 10, "order": 2}
     new_entry_1 = {"id": 201, "slot": 101, "exercise": 1627}
     new_entry_2 = {"id": 202, "slot": 102, "exercise": 205}
 
@@ -185,8 +196,24 @@ async def test_copy_day_to_routine_creates_day_slots_and_entries(
         httpx.Response(200, json=entries_slot11),
         httpx.Response(200, json=entries_slot12),
     ])
-    day_post = respx_mock.post("/day/").mock(return_value=httpx.Response(201, json=new_day))
-    slot_post = respx_mock.post("/slot/").mock(side_effect=[
+    # Config fetches: for entry 21 then entry 22, 5 endpoints each
+    respx_mock.get("/repetitions-config/").mock(side_effect=[
+        httpx.Response(200, json=reps_cfg_21),
+        httpx.Response(200, json=reps_cfg_22),
+    ])
+    respx_mock.get("/sets-config/").mock(side_effect=[
+        httpx.Response(200, json=sets_cfg_21),
+        httpx.Response(200, json=sets_cfg_22),
+    ])
+    respx_mock.get("/weight-config/").mock(side_effect=[
+        httpx.Response(200, json=weight_cfg_21),
+        httpx.Response(200, json=weight_cfg_22),
+    ])
+    respx_mock.get("/rest-config/").mock(return_value=httpx.Response(200, json=empty_page))
+    respx_mock.get("/rir-config/").mock(return_value=httpx.Response(200, json=empty_page))
+
+    day_post   = respx_mock.post("/day/").mock(return_value=httpx.Response(201, json=new_day))
+    slot_post  = respx_mock.post("/slot/").mock(side_effect=[
         httpx.Response(201, json=new_slot_1),
         httpx.Response(201, json=new_slot_2),
     ])
@@ -194,6 +221,9 @@ async def test_copy_day_to_routine_creates_day_slots_and_entries(
         httpx.Response(201, json=new_entry_1),
         httpx.Response(201, json=new_entry_2),
     ])
+    config_post = respx_mock.post(url__regex=r"/(repetitions|sets|weight|rest|rir)-config/").mock(
+        return_value=httpx.Response(201, json={"id": 99})
+    )
 
     result = await mcp_client.call_tool(
         "copy_day_to_routine", {"day_id": 3, "target_routine_id": 5}
@@ -202,16 +232,23 @@ async def test_copy_day_to_routine_creates_day_slots_and_entries(
     assert day_post.called
     assert slot_post.call_count == 2
     assert entry_post.call_count == 2
+    assert config_post.call_count == 6  # 3 configs × 2 entries
 
-    # New day should be in target routine
     day_body = json.loads(day_post.calls.last.request.content)
     assert day_body["routine"] == 5
     assert day_body["name"] == "Legs"
 
-    # Result summarises what was created
     assert result.data["new_day_id"] == 10
     assert result.data["slots_copied"] == 2
     assert result.data["entries_copied"] == 2
+    assert result.data["configs_copied"] == 6
+
+    # Configs must point to the NEW entry IDs, not the originals
+    config_bodies = [json.loads(call.request.content) for call in config_post.calls]
+    new_entry_ids = {b["slot_entry"] for b in config_bodies}
+    assert new_entry_ids == {201, 202}
+    assert 21 not in new_entry_ids
+    assert 22 not in new_entry_ids
 
 
 @pytest.mark.respx(base_url="http://testserver/api/v2")
